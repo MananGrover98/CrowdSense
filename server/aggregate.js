@@ -190,7 +190,7 @@ function suggestAfternoon(reports, now) {
   if (am != null && pm != null && am + 5 < pm) {
     return 'Mornings (before 2 PM) have been a bit lighter recently — consider going earlier.';
   }
-  return 'Mid-afternoon (after 2:30 PM) is often calmer on many campuses — check live reports before you go.';
+  return 'For official drop-in or appointment times, use umb.edu (Official links in the app). Numbers here are only from past student reports in Advising Pulse.';
 }
 
 /**

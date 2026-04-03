@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { CrowdLevel, Dashboard, Office, VisitReason } from './api';
 import { fetchDashboard, fetchMeta, submitReport } from './api';
+import { OFFICIAL_UMB_LINKS } from './officialLinks';
 
 const CROWD_OPTIONS: { value: CrowdLevel; label: string }[] = [
   { value: 'quiet', label: 'Quiet' },
@@ -54,6 +55,7 @@ export default function App() {
   const [formComment, setFormComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [submitOk, setSubmitOk] = useState(false);
+  const [lastRefreshAt, setLastRefreshAt] = useState<Date | null>(null);
 
   const load = useCallback(async () => {
     setError(null);
@@ -64,6 +66,7 @@ export default function App() {
         reason: filterReason || undefined,
       });
       setDashboard(d);
+      setLastRefreshAt(new Date());
     } catch {
       setError(
         'No connection to the app server. If you’re on the live site, wait a minute — free hosting sometimes “sleeps.” Otherwise run npm run dev locally.'
@@ -97,7 +100,7 @@ export default function App() {
   }, [load]);
 
   useEffect(() => {
-    const t = setInterval(load, 25_000);
+    const t = setInterval(load, 15_000);
     return () => clearInterval(t);
   }, [load]);
 
@@ -143,7 +146,38 @@ export default function App() {
         <h1>Advising Pulse UMB</h1>
         <span className="brand-badge">UMass Boston</span>
       </header>
-      <p className="tagline one-line-tagline">See how busy advising is — straight from students on campus.</p>
+      <p className="tagline one-line-tagline">Crowd and wait hints from students — not an official UMass Boston wait-time system.</p>
+
+      <div className="trust-strip card card-pad">
+        <p className="trust-strip-main">
+          <strong>How to read this:</strong> Numbers are <strong>peer estimates</strong> from the last ~{dashboard?.windowMinutes ?? 20}{' '}
+          minutes. They can lag real life by several minutes and are <strong>not verified</strong> by the university. This page refreshes about
+          every 15 seconds
+          {lastRefreshAt && (
+            <>
+              {' '}
+              (last loaded {lastRefreshAt.toLocaleTimeString()})
+            </>
+          )}
+          .
+        </p>
+        <details className="official-links-details">
+          <summary>Official UMass Boston links — hours, drop-ins, and appointments</summary>
+          <p className="muted official-links-intro">
+            Schedules change every term. We only link out; we do <strong>not</strong> show SSC or office hours here so nothing goes stale.
+          </p>
+          <ul className="official-link-list">
+            {OFFICIAL_UMB_LINKS.map((item) => (
+              <li key={item.href}>
+                <a href={item.href} target="_blank" rel="noopener noreferrer">
+                  {item.label}
+                </a>
+                <span className="official-link-note"> — {item.note}</span>
+              </li>
+            ))}
+          </ul>
+        </details>
+      </div>
 
       <nav className="tab-bar" aria-label="Main">
         <button
@@ -232,7 +266,7 @@ export default function App() {
               </div>
             )}
 
-            <h2 className="panel-title">Crowd &amp; wait (last ~{dashboard?.windowMinutes ?? 20} min)</h2>
+            <h2 className="panel-title">Student-reported crowd &amp; wait (last ~{dashboard?.windowMinutes ?? 20} min)</h2>
             <ul className="summary-list">
               {displayedSummaries.map((s) => (
                 <li key={s.officeId}>
@@ -288,7 +322,13 @@ export default function App() {
             )}
 
             <details className="tips-details">
-              <summary>When to come back (from past {dashboard?.predictions?.historyDays ?? 14} days)</summary>
+              <summary>
+                Busiest / calmer clock hours (past {dashboard?.predictions?.historyDays ?? 14} days of reports here only)
+              </summary>
+              <p className="muted tips-disclaimer">
+                This uses historical student submissions in Advising Pulse — not SSC drop-in hours or any official schedule. Sparse data
+                can look random; use the official links above for real appointment and drop-in times.
+              </p>
               <div className="predict-grid">
                 <div className="predict-block">
                   <h3>Busiest hours</h3>
@@ -433,7 +473,8 @@ export default function App() {
       )}
 
       <p className="footer-note">
-        Not affiliated with UMass Boston. Peer info only — not official wait times.
+        Advising Pulse UMB is independent and not run by UMass Boston. Crowd and wait figures are student-submitted estimates, not
+        official. For accurate hours, policies, and services, rely on umb.edu and campus offices.
       </p>
     </div>
   );
