@@ -1,0 +1,174 @@
+================================================================================
+  ADVISING PULSE UMB — PUBLISH FROM YOUR PC TO THE WEB (FULL WALKTHROUGH)
+================================================================================
+
+WHAT “YOUR-SERVICE” / “YOUR-URL” MEANS
+--------------------------------------
+  In older notes we wrote things like:
+      https://YOUR-SERVICE.onrender.com
+  That is NOT special code. It is a PLACEHOLDER for the real web address
+  Render gives you after deploy, for example:
+      https://advising-pulse-umb.onrender.com
+  You replace the placeholder with YOUR exact URL (copy from the Render dashboard).
+  Same idea for CORS_ORIGIN: use that exact https://... address (no slash at the end).
+
+WHAT YOU ARE PUBLISHING
+-----------------------
+  One Node app that serves:
+    • the React website (HTML/JS/CSS), and
+    • the /api routes (same server, same URL).
+  You do not upload files by hand to Render — it pulls from GitHub and builds.
+
+ACCOUNTS YOU NEED
+-----------------
+  • GitHub account (free): https://github.com
+  • Render account (free tier): https://render.com
+  Optional later:
+  • Supabase (free): https://supabase.com — only if you want reports to survive
+    when the free server sleeps or restarts.
+
+================================================================================
+PART 1 — PREPARE THE PROJECT ON YOUR COMPUTER
+================================================================================
+
+  1) Open PowerShell and go to the project folder, for example:
+       cd "C:\Users\manan\Downloads\CrowdSense"
+
+  2) Install dependencies (once):
+       npm install
+
+  3) Confirm it builds:
+       npm run build
+     If this fails, fix errors before publishing.
+
+  4) Optional — test “production mode” locally:
+       npm start
+     Open http://127.0.0.1:3847 in the browser. Stop the server with Ctrl+C when done.
+
+================================================================================
+PART 2 — PUT THE CODE ON GITHUB
+================================================================================
+
+  Render deploys FROM GitHub, so the repo must be online.
+
+  A) Create a new empty repository on GitHub
+     • GitHub → green “New” → name it e.g. advising-pulse-umb
+     • Do NOT add README / .gitignore / license if GitHub asks (keeps push simple),
+       OR add them — either works.
+
+  B) If this folder is not a git repo yet, in PowerShell inside the project folder:
+       git init
+       git add .
+       git commit -m "Initial commit: Advising Pulse UMB"
+
+  C) Connect to GitHub and push (replace YOUR_USER and YOUR_REPO):
+       git branch -M main
+       git remote add origin https://github.com/YOUR_USER/YOUR_REPO.git
+       git push -u origin main
+
+     If GitHub shows a different “push” snippet, you can follow theirs instead.
+
+  D) Refresh GitHub in the browser — you should see your project files.
+
+================================================================================
+PART 3 — CREATE THE WEB SERVICE ON RENDER
+================================================================================
+
+  1) Log in at https://render.com
+
+  2) Dashboard → New + → Web Service
+
+  3) Connect your GitHub account if asked, and select the repository you just pushed.
+
+  4) Render may auto-fill from render.yaml in the repo. Confirm:
+       • Runtime: Node
+       • Build Command:  npm install && npm run build
+       • Start Command:  npm start
+
+  5) Plan: Free (fine for a side project; the app may “sleep” when idle).
+
+  6) Click Create Web Service (or Deploy).
+
+  7) Wait for the build log to finish. If it fails, read the red error in the log
+     (often a missing dependency or build typo) and fix → commit → push → Render redeploys.
+
+================================================================================
+PART 4 — YOUR LIVE URL AND CORS (IMPORTANT)
+================================================================================
+
+  1) When deploy succeeds, Render shows a public URL at the top, for example:
+       https://something.onrender.com
+     Copy that full address. That is “your service” — your live app.
+
+  2) Set CORS so browsers only talk to your API from your real site:
+       • In Render: your Web Service → Environment
+       • Add variable:
+           Name:   CORS_ORIGIN
+           Value:  https://something.onrender.com
+         (exact same host as Render gave you, https, NO trailing slash)
+
+  3) Save — Render will redeploy once.
+
+  4) If you also develop with Vite on your PC (npm run dev), you can allow both:
+           CORS_ORIGIN=http://localhost:5173,https://something.onrender.com
+     (comma between URLs, no spaces around the comma is safest.)
+
+================================================================================
+PART 5 — OPTIONAL: SUPABASE (DATA SURVIVES RESTARTS)
+================================================================================
+
+  Free Render disk is often wiped when the instance restarts. To keep reports:
+
+  1) Supabase → New project → wait until ready.
+
+  2) SQL Editor → New query → paste the entire contents of:
+         supabase/schema.sql
+     → Run.
+
+  3) Project Settings → API:
+       • Copy “Project URL”
+       • Copy “service_role” secret (server only — never paste in GitHub or the browser)
+
+  4) Render → Environment → add:
+         SUPABASE_URL                 = (Project URL)
+         SUPABASE_SERVICE_ROLE_KEY    = (service_role key)
+
+  5) Save → redeploy.
+
+================================================================================
+PART 6 — VERIFY THE LIVE APP
+================================================================================
+
+  1) Open your https://....onrender.com in a normal browser.
+
+  2) First load after sleep can take 30–60 seconds on free tier — wait and refresh once.
+
+  3) Use the three tabs: Live status · What people said · Report my wait.
+     Submit a test report, then check Live status and the feed.
+
+  4) Optional API check from PowerShell (replace YOUR_URL):
+       Invoke-RestMethod "https://YOUR_URL/api/offices"
+
+  5) From the project folder you can also run (server must be reachable):
+       npm run smoke https://YOUR_URL
+
+================================================================================
+QUICK COMMAND REFERENCE (LOCAL)
+================================================================================
+
+  npm install          — install packages
+  npm run dev          — dev: API + Vite (two processes)
+  npm run build        — production build → dist/
+  npm start            — serve dist + API (one port, default 3847)
+  npm run smoke        — quick API test (default http://127.0.0.1:3847)
+
+================================================================================
+TROUBLESHOOTING
+================================================================================
+
+  • Build fails on Render: read the build log; usually run npm run build on your PC and fix.
+  • Site spins / 502: free tier waking up — wait and retry.
+  • Browser blocks API / CORS errors: set CORS_ORIGIN exactly to your Render URL.
+  • Data disappeared after days: use Supabase (Part 5) or accept demo-only storage.
+
+================================================================================

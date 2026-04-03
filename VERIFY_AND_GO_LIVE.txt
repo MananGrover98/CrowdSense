@@ -1,0 +1,111 @@
+================================================================================
+  ADVISING PULSE UMB — SECURITY / QA REVIEW + GO LIVE + REAL-WORLD TESTING
+================================================================================
+
+A) WHAT WAS CHECKED (SUMMARY)
+-----------------------------
+
+BACKEND
+  • API validates officeId, crowdLevel, reason (allowlist only).
+  • waitMinutes must be a finite number 0–240 (bad payloads rejected with 400).
+  • College filter query capped at 120 characters (DoS / log-noise guard).
+  • POST /api/reports rate-limited per IP (~45 submissions / 15 min) → 429.
+  • trust proxy enabled so IP is correct behind Render / similar hosts.
+  • x-powered-by header disabled (minor fingerprint reduction).
+  • reports.json: safe JSON parse; corrupt files no longer crash the process.
+  • Stored rows normalized (invalid crowd_level coerced; bad rows dropped).
+  • Supabase rows validated the same way after fetch.
+  • Generic error message to clients on storage failure (no stack traces).
+
+FRONTEND
+  • React text rendering escapes comments (XSS baseline for displayed text).
+  • Feed empty state uses same time window as API (windowMinutes).
+  • crowdLevel display tolerates odd data via String(...).replace.
+  • Dashboard / submit errors surface server { error } when present.
+  • 429 rate-limit message shown on submit.
+
+CONSISTENCY (BACKEND ↔ FRONTEND)
+  • Offices and reasons come only from /api/offices (single source of truth).
+  • Filters (office, college, reason) apply identically to Live + Feed (same fetch).
+  • Crowd options match server allowlist.
+
+KNOWN LIMITATIONS (ACCEPT FOR MVP)
+  • No user accounts; reports are anonymous (spam = rate limit + manual moderation later).
+  • CORS defaults to “open” if CORS_ORIGIN is unset (fine for local dev; see below).
+  • In-memory rate limit resets if the server process restarts.
+  • File storage on free hosts may reset when the instance sleeps (use Supabase for persistence).
+
+================================================================================
+B) SECURITY NOTES FOR PRODUCTION
+================================================================================
+
+1) CORS (recommended on Render)
+   In the hosting dashboard → Environment, add:
+     CORS_ORIGIN=https://YOUR-SERVICE.onrender.com
+   For local + prod testing you can use a comma list, e.g.:
+     CORS_ORIGIN=http://localhost:5173,https://YOUR-SERVICE.onrender.com
+
+2) Supabase service role
+   Never commit it; only set as a server environment variable.
+   Never expose it in the browser or GitHub.
+
+3) Peer content
+   Students can type anything in comments. For a wider rollout, plan a simple
+   moderation process or reporting link — this is policy, not code.
+
+================================================================================
+C) BRING IT LIVE (MINIMAL STEPS)
+================================================================================
+
+1. Push this project to a GitHub repo (any private/public repo is fine).
+
+2. Render.com → New + → Web Service → connect the repo.
+   • Build command:  npm install && npm run build
+   • Start command:  npm start
+   • Add env: CORS_ORIGIN=https://<your-render-url>  (no trailing slash)
+
+3. Optional persistence (recommended):
+   • Supabase → SQL → run supabase/schema.sql
+   • Render env: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+   • Redeploy
+
+4. Open the Render URL in a normal browser (not localhost).
+
+================================================================================
+D) ERROR / REGRESSION CHECKS (RUN YOURSELF)
+================================================================================
+
+After deploy (or locally after `npm run build` && `npm start`):
+
+  1. Open the site → Live status should list all offices (even with zero reports).
+  2. Open DevTools → Network → confirm GET /api/offices and GET /api/dashboard 200.
+  3. Report my wait → submit one report → switch to Live status → your office
+     should show updated counts within a refresh (or ≤25 s auto-refresh).
+  4. What people said → your comment appears (same filters as step 3).
+  5. Filters: pick one office + reason → feed should narrow; clear filters → wider.
+  6. Spam guard: rapid-submit many posts from the same network → eventually 429
+     (expected; wait ~15 minutes or test from another network).
+
+Local quick API probe (PowerShell), base URL adjusted:
+
+  Invoke-RestMethod "https://YOUR-URL/api/offices"
+  Invoke-RestMethod "https://YOUR-URL/api/dashboard"
+
+================================================================================
+E) REAL DATA & “REAL TIME” IMPRESSIONS (HOW TO TEST HONESTLY)
+================================================================================
+
+• “Real data”: recruit a few classmates to submit from real visits (different
+  offices, times, reasons). Aim for at least 3–5 reports in the same 20-minute
+  window on one office so averages don’t look random.
+
+• “Real time”: the app auto-refreshes dashboard data about every 25 seconds.
+  Free hosts may “sleep” after idle — first load after sleep can take ~30–60 s.
+  That’s hosting behavior, not a bug in the app.
+
+• Sanity checklist after a real advising visit:
+  – Crowd level matches what you saw.
+  – Wait minutes are in the ballpark.
+  – Comment is useful and contains no names/contact info.
+
+================================================================================
